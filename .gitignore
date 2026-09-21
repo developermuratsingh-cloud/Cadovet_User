@@ -2,6 +2,7 @@
 
 # dependencies
 node_modules/
+node_modules
 
 # Expo
 .expo/
@@ -30,8 +31,13 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files (keep .env.example as the template)
+.env
+.env.*
+!.env.example
+
+# local tool settings
+.claude/settings.local.json
 
 # typescript
 *.tsbuildinfo
