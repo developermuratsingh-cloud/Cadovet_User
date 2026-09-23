@@ -1,41 +1,53 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 
 import { isApiError } from '@/core/errors';
-import { useDeleteAccountMutation } from '@/data/api/userApi';
-import { AppText, Button, Card, Screen, TextField } from '../../components';
+import { useDeleteAccountMutation, useGetMeQuery, useSendDeleteOtpMutation } from '@/data/api/userApi';
+import { AppText, Button, Card, OtpEntry, Screen } from '../../components';
 import { useApiErrorMessage } from '../../hooks/useApiErrorMessage';
-import { useForm } from '../../hooks/useForm';
 import { useTheme } from '../../theme/useTheme';
 
 const BULLETS = ['b1', 'b2', 'b3', 'b4', 'b5'] as const;
-const validators = { password: (v: string) => (v ? null : ({ code: 'required' } as const)) };
 
+// Deleting is irreversible, so it needs fresh proof of ownership: a code texted to the account's mobile number.
 export default function DeleteAccountScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const errorMessage = useApiErrorMessage();
-  const [deleteAccount, { isLoading, error }] = useDeleteAccountMutation();
-  const form = useForm({ password: '' }, validators);
+  const { data: me } = useGetMeQuery();
+  const mobile = me?.profile.mobile;
+  const [sendCode, { isLoading: sending, error: sendError }] = useSendDeleteOtpMutation();
+  const [deleteAccount, { isLoading: deleting, error: deleteError }] = useDeleteAccountMutation();
+  const [codeSent, setCodeSent] = useState(false);
 
-  const confirm = form.handleSubmit(({ password }) =>
+  const send = async () => {
+    try {
+      await sendCode().unwrap();
+      setCodeSent(true);
+    } catch {
+      // shown through sendError
+    }
+  };
+
+  const confirm = (code: string) =>
     Alert.alert(t('deleteAccount.confirmTitle'), t('deleteAccount.confirmMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       // On success the mutation clears the session and the router returns to Login.
-      { text: t('deleteAccount.confirm'), style: 'destructive', onPress: () => deleteAccount({ password }) },
-    ]),
-  );
+      { text: t('deleteAccount.confirm'), style: 'destructive', onPress: () => deleteAccount({ code }) },
+    ]);
 
-  // 403 = wrong password (or a staff account); the server text tells the two apart.
-  const serverError = error
-    ? isApiError(error) && error.status === 403
-      ? /password/i.test(error.message) ? t('deleteAccount.wrongPassword') : t('deleteAccount.staffBlocked')
-      : errorMessage(error)
+  // 403 = wrong/expired code (or a staff account); the server text tells the two apart.
+  const deleteMessage = deleteError
+    ? isApiError(deleteError) && deleteError.status === 403
+      ? /code/i.test(deleteError.message) ? t('deleteAccount.wrongCode') : t('deleteAccount.staffBlocked')
+      : isApiError(deleteError) && deleteError.status === 429 ? t('otp.tooMany') : errorMessage(deleteError)
     : null;
+  const sendMessage = sendError ? (isApiError(sendError) && sendError.status === 429 ? t('otp.tooManyRequests') : errorMessage(sendError)) : null;
 
   return (
-    <Screen edges={['left', 'right', 'bottom']} footer={<Button title={t('deleteAccount.button')} icon="trash-outline" variant="danger" onPress={confirm} loading={isLoading} />}>
+    <Screen edges={['left', 'right', 'bottom']} footer={codeSent ? undefined : <Button title={t('deleteAccount.sendCode')} icon="chatbubble-outline" variant="danger" onPress={send} loading={sending} disabled={!mobile} />}>
       <Card style={{ borderColor: colors.danger, gap: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Ionicons name="warning" size={24} color={colors.danger} />
@@ -50,17 +62,20 @@ export default function DeleteAccountScreen() {
         ))}
       </Card>
 
-      <TextField
-        {...form.fieldProps('password')}
-        label={t('deleteAccount.password')}
-        icon="lock-closed-outline"
-        secureTextEntry
-        textContentType="password"
-        autoComplete="current-password"
-        returnKeyType="go"
-        onSubmitEditing={confirm}
-      />
-      {serverError ? <AppText color="danger" accessibilityRole="alert">{serverError}</AppText> : null}
+      {me && !mobile ? <AppText color="danger" accessibilityRole="alert">{t('deleteAccount.noMobile')}</AppText> : null}
+      {mobile ? <AppText color="textSecondary">{t('deleteAccount.verifyIntro', { mobile })}</AppText> : null}
+      {sendMessage ? <AppText color="danger" accessibilityRole="alert">{sendMessage}</AppText> : null}
+
+      {codeSent ? (
+        <OtpEntry
+          submitLabel={t('deleteAccount.button')}
+          submitVariant="danger"
+          onSubmit={confirm}
+          onResend={() => sendCode().unwrap()}
+          loading={deleting}
+          error={deleteMessage}
+        />
+      ) : null}
     </Screen>
   );
 }

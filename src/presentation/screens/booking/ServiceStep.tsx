@@ -26,7 +26,7 @@ export default function ServiceStep() {
 
   const choose = (service: Service) => {
     dispatch(serviceSelected(service));
-    router.push('/book/doctor');
+    router.push('/book/pet');
   };
 
   return (

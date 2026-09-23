@@ -8,8 +8,9 @@ The backend (`../cado_vet/cadovet-server`) is the single source of truth. The ap
 ## Run
 
 ```bash
-# 1. backend (port 5001) – needs PostgreSQL; apply the new migration once:
+# 1. backend (port 5001) – needs PostgreSQL; apply the migrations once:
 psql -d cadovet -f ../cado_vet/cadovet-server/src/database/migrate_mobile.sql
+psql -d cadovet -f ../cado_vet/cadovet-server/src/database/migrate_otp.sql
 cd ../cado_vet/cadovet-server && npm start
 
 # 2. app
@@ -19,7 +20,51 @@ npx expo start
 
 In development the API host is taken from the Expo dev server, so a physical device on the same Wi-Fi works
 without configuration. Override with `EXPO_PUBLIC_API_URL` (see `.env.example`) for other networks or
-production. Android emulator: `http://10.0.2.2:5001/api`. Demo login: `customer@cadovet.com` / `customer123`.
+production. Android emulator: `http://10.0.2.2:5001/api`.
+
+## Test credentials
+
+There are no passwords: sign in with a mobile number and a 6-digit code. For local testing the backend accepts one fixed code
+for a list of test numbers, so no SMS provider is needed. **Code for every number below: `123456`** (country **+91 India**).
+
+| Use it to | Mobile | Account |
+|---|---|---|
+| Sign in with existing data | `9876543213` | Rahul Verma — 2 pets, 2 appointments |
+| Sign in with existing data | `9876543214` | Sarah Jenkins — 2 pets, 1 appointment |
+| Test **sign up** (numbers are unused) | `9000000001` … `9000000005` | Enter any name; email and referral code are optional |
+| Test **delete account** | a `900000000x` number you signed up | Menu → Delete account → Send code → `123456`. Don't delete Rahul or Sarah: it anonymises them for good |
+| Work the **admin panel** (website `/login` → *Staff* tab) | `ops@cadovet.com` / `staff123` (operational head) · `doctor@cadovet.com` / `doctor123` · `admin@cadovet.com` / `admin123` | Staff sign in with **email + password** (not OTP). See `../cado_vet/README.md` for who sees what |
+
+Steps: open the app → enter the number → **Send OTP** → enter `123456` → **Verify**.
+A number that has no account shows "No account found" on Sign in; a number that already has one shows "already exists" on Sign up.
+Deleting an account anonymises it and frees the number, so a `900000000x` number can be signed up again afterwards.
+
+How it works and where it is switched on — backend `cadovet-server/.env` (template in `.env.example`):
+
+```
+OTP_TEST_CODE=123456
+OTP_TEST_MOBILES=9876543213,9876543214,9000000001,9000000002,9000000003,9000000004,9000000005
+```
+
+The fixed code applies **only** to the numbers listed in `OTP_TEST_MOBILES`; every other number gets a random code (printed in
+the backend console as `[otp] (SMS not configured) code for …` while no SMS provider is set). It is ignored — with a warning in
+the log — when `NODE_ENV=production` or when a real SMS provider (Twilio) is configured, so it cannot leak into a live setup.
+Staff accounts are never covered by the fixed code (they use email + password). Never put real people's numbers in `OTP_TEST_MOBILES`; the seeded numbers are dev data only.
+
+### Booking is a request
+
+The app lets the customer choose **service → pet → date and time** (times come from the clinic's availability). There is no doctor
+step: the request is sent `PENDING`, the **operational head assigns a doctor**, and the appointment turns **Confirmed** with the
+doctor's name. Until then it shows as *Awaiting confirmation* / *Doctor to be assigned*. Rescheduling a confirmed visit sends it back
+for confirmation. Details in [`../cado_vet/README.md`](../cado_vet/README.md) (*Clinic workflow*).
+
+### How this app connects to the rest of the system
+
+The app, the website (`cadovet-client`), the admin portal (the same React app under `/admin`) and the backend
+(`cadovet-server`) share one API and one customer identity: a customer registered here can sign in on the website with the same
+mobile number and OTP, a website guest booking shows up in the app once the guest signs in, and everything staff do in the portal
+is what the customer sees here. The full picture, the backend test suite (`npm test`), the real-browser end-to-end run
+(`npm run e2e`) and a production checklist are in [`../cado_vet/README.md`](../cado_vet/README.md).
 
 `npm run typecheck` runs the TypeScript check; `npm test` runs the validation, search and date tests.
 
@@ -72,7 +117,7 @@ Login/signup loading and error state come from the RTK Query mutation state inst
   vaccination services to book. **Need Help**: FAQ. **Contact Support**: WhatsApp / call / email plus a validated message form.
 - **Blog** uses a new backend API (`GET /api/blogs`, `GET /api/blogs/:slug`, public), seeded with the website's 7 articles
   (`migrate_blog.sql`).
-- **Delete account** (`DELETE /api/auth/me`, password required): anonymises rather than removes — name, email/mobile and address
+- **Delete account** (`POST /api/auth/me/otp` sends a code to the account's mobile, then `DELETE /api/auth/me` with `{code}`): anonymises rather than removes — name, email/mobile and address
   are erased, upcoming appointments cancelled, pets deactivated, sessions revoked and sign-in blocked. Invoices and medical records
   are kept without personal details. Staff accounts cannot use it.
 
@@ -115,20 +160,27 @@ paw watermark. Light/dark themes and English/Hindi are switchable in Profile.
 
 Rules are pure functions in `domain/usecases/validation.ts` (tested in `tests/`), surfaced by the `useForm` hook
 (errors show after a field is blurred or on submit) and translated per language:
-email/mobile format (spaces and dashes in mobile numbers are accepted), name (unicode letters incl. Devanagari, 2–60),
-password 6–72 with confirm + strength meter on signup, pet date of birth (masked `YYYY-MM-DD`, real date, not in the
+mobile number (validated against the selected country's numbering plan by `libphonenumber-js`), optional email format,
+name (unicode letters incl. Devanagari, 2–60), pet date of birth (masked `YYYY-MM-DD`, real date, not in the
 future), weight 0.1–200 kg, 6-digit PIN code, and length limits with character counters.
 The backend re-validates signup, pets and appointment dates (no past dates), so the rules cannot be bypassed.
 
-## Forgot password
+## Sign in with OTP (no passwords)
 
-Sign in → **Forgot password?** → enter email/mobile → enter the 6-digit code + a new password.
-Backend: `POST /api/auth/forgot-password` and `POST /api/auth/reset-password` (`migrate_password_reset.sql`).
+Customers have no password. **Sign in**: mobile number → 6-digit code by SMS → signed in. **Sign up**: name + mobile (required)
++ email (optional) + referral code → code → account created and signed in. The mobile field has a country-code button with a
+searchable list (`libphonenumber-js` for calling codes and validation, `i18n-iso-countries` for names; India +91 is preselected).
+Backend: `POST /api/auth/otp/send` (`{mobile, purpose: 'login'|'signup', email?}`), `POST /api/auth/otp/login` and
+`POST /api/auth/otp/signup` (both return the same `{token, refreshToken, user}` as the password login), table `otp_codes`
+(`migrate_otp.sql`). Accounts created this way get a random unusable password hash, so they can only be entered with a code.
+The website and staff accounts keep using `POST /api/auth/login` with a password, and the old reset endpoints are unchanged.
+Mobile numbers are stored as the server has always stored them: the plain 10-digit number for India, `+<country><number>` for
+every other country (`toServerMobile` in `domain/usecases/validation.ts`).
 The code is 6 digits, stored only as a keyed hash, valid 10 minutes, single use, locked after 5 wrong attempts, and limited to
-3 requests per hour per account. The reply never reveals whether an account exists. A successful reset signs the account out
-everywhere.
+5 requests per hour per number and purpose. Signing in with an unregistered number answers 404 (the sign-up endpoint already
+reveals which numbers exist), so the app can point the user to Sign up.
 
-**Delivery**: an email address gets the code by **email** (any SMTP provider) and a mobile number gets it by **SMS** (Twilio).
+**Delivery**: the codes go by **SMS** (Twilio); the password-reset endpoints can also use **email** (any SMTP provider).
 Both are optional and configured in `cadovet-server/.env` (see `.env.example`):
 
 ```
@@ -136,7 +188,7 @@ SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, MAIL_FROM          # em
 TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM | TWILIO_MESSAGING_SERVICE_SID, SMS_DEFAULT_COUNTRY_CODE=91   # SMS
 ```
 
-Without a provider the code is printed in the backend console instead (`[password-reset] (email not configured) code for …`).
+Without a provider the code is printed in the backend console instead (`[otp] (SMS not configured) code for …`).
 Sending happens in the background, so provider latency or outages never change the API reply and cannot reveal which accounts
 exist; failures are logged as `[password-reset] delivery via … failed`. 10-digit numbers get `SMS_DEFAULT_COUNTRY_CODE`
 (default 91) prepended; numbers starting with `+` are used as is. To use another SMS vendor (e.g. MSG91) add a function next to
@@ -145,7 +197,7 @@ never enable it in production. Note: SMS to Indian numbers usually needs DLT reg
 
 ## Auth flow
 
-login → `{token, refreshToken}` → secure storage + `auth` slice → `Authorization: Bearer` on every request.
+OTP login/sign-up → `{token, refreshToken}` → secure storage + `auth` slice → `Authorization: Bearer` on every request.
 A 401 triggers one shared `POST /auth/refresh` (the server rotates refresh tokens), then the request is retried.
 If the refresh is rejected the session, secure storage and the API cache are cleared and the router returns to Login;
 a network failure during refresh does **not** log the user out.
@@ -161,6 +213,6 @@ a network failure during refresh does **not** log the user out.
 
 ## Known limits
 
-- The backend has no products, packages, blogs, cart, orders, payments, push tokens, image upload or OTP.
+- The backend has no products, packages, cart, orders, payments, push tokens or image upload.
 - `PUT /pets/:id` uses COALESCE, so numeric/date fields cannot be cleared once set.
-- Password reset is not available (no backend endpoint).
+- Older customer accounts that only have an email (no mobile number) cannot sign in from the app, since sign-in is by mobile OTP.

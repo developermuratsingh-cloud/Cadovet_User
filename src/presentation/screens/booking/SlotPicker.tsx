@@ -8,7 +8,6 @@ import { addDays, toDateString } from '@/domain/usecases/dates';
 import { AppText, Chip, DatePicker, EmptyState, ErrorState, LoadingView } from '../../components';
 
 interface Props {
-  doctorId: number;
   date: string | null;
   time: string | null;
   onDateChange: (date: string) => void;
@@ -17,14 +16,15 @@ interface Props {
 
 const DAYS_AHEAD = 90; // how far ahead a visit can be booked
 
-// Date strip + time slots driven by the backend's availability endpoint (working days, hours, booked slots).
-export function SlotPicker({ doctorId, date, time, onDateChange, onTimeChange }: Props) {
+// Date strip + time slots driven by the backend's clinic availability (every doctor's working days and hours, minus
+// the times that are already full). The customer picks a time; the clinic assigns the doctor.
+export function SlotPicker({ date, time, onDateChange, onTimeChange }: Props) {
   const { t } = useTranslation();
   const today = useMemo(() => toDateString(new Date()), []);
   const lastDay = useMemo(() => addDays(today, DAYS_AHEAD), [today]);
   // A draft date from an earlier day (e.g. the app stayed open overnight) is no longer selectable.
   const selectedDate = date && date >= today ? date : null;
-  const { currentData: data, isFetching, error, refetch } = useGetAvailabilityQuery({ doctorId, date: selectedDate ?? '' }, { skip: !selectedDate });
+  const { currentData: data, isFetching, error, refetch } = useGetAvailabilityQuery({ date: selectedDate ?? '' }, { skip: !selectedDate });
   const slots = useMemo(() => (data && selectedDate ? filterFutureSlots(data, selectedDate) : []), [data, selectedDate]);
 
   return (

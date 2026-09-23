@@ -58,7 +58,7 @@ export default function AppointmentDetailScreen() {
             <Card>
               <Field label={t('booking.when')} value={`${formatDate(a.date, language, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · ${a.time}`} />
               <Field label={t('booking.pet')} value={a.petName} />
-              <Field label={t('booking.doctor')} value={a.doctorName} />
+              <Field label={t('booking.doctor')} value={a.doctorName ?? t('appointments.doctorPending')} />
               <Field label={t('appointments.reason')} value={a.reason} />
               {a.couponCode ? <Field label={t('appointments.couponApplied', { code: a.couponCode })} value={`− ${formatCurrency(a.discountAmount, language)}`} /> : null}
               <Field label={t('appointments.notes')} value={a.notes} />

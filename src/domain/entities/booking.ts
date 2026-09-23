@@ -1,10 +1,8 @@
-import type { Doctor } from './doctor';
 import type { Service } from './service';
 
 // In-progress booking wizard state. Availability and final validation are enforced by the backend.
 export interface BookingDraft {
   selectedService: Service | null;
-  selectedDoctor: Doctor | null;
   petId: number | null;
   selectedDate: string | null; // YYYY-MM-DD
   selectedTime: string | null; // "10:30 AM"

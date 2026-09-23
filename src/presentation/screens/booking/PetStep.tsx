@@ -22,7 +22,7 @@ export default function PetStep() {
 
   return (
     <Screen edges={['left', 'right', 'bottom']}>
-      <StepHeader current={3} title={t('booking.choosePet')} />
+      <StepHeader current={2} title={t('booking.choosePet')} />
       <AsyncBoundary {...query}>
         {(pets) =>
           pets.length === 0 ? (

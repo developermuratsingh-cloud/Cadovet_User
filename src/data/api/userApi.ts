@@ -31,9 +31,14 @@ export const userApi = baseApi.injectEndpoints({
       transformResponse: unwrap(toCurrentUser),
       invalidatesTags: ['Me'],
     }),
-    // Anonymises the account server-side (password required). On success the session is cleared locally,
-    // which also wipes the API cache and returns the router to Login.
-    deleteAccount: build.mutation<void, { password: string }>({
+    // Deleting needs a fresh proof of ownership: a code is sent by SMS to the account's own mobile number.
+    sendDeleteOtp: build.mutation<void, void>({
+      query: () => ({ url: '/auth/me/otp', method: 'POST' }),
+      transformResponse: (_: ApiEnvelope<unknown>) => undefined,
+    }),
+    // Anonymises the account server-side. On success the session is cleared locally, which also wipes the API cache
+    // and returns the router to Login.
+    deleteAccount: build.mutation<void, { code: string }>({
       query: (body) => ({ url: '/auth/me', method: 'DELETE', body }),
       transformResponse: (_: ApiEnvelope<unknown>) => undefined,
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
@@ -41,11 +46,11 @@ export const userApi = baseApi.injectEndpoints({
           await queryFulfilled;
           dispatch(loggedOut());
         } catch {
-          // Failure (e.g. wrong password) surfaces through the mutation state on the calling screen.
+          // Failure (e.g. wrong code) surfaces through the mutation state on the calling screen.
         }
       },
     }),
   }),
 });
 
-export const { useGetMeQuery, useUpdateMeMutation, useDeleteAccountMutation } = userApi;
+export const { useGetMeQuery, useUpdateMeMutation, useSendDeleteOtpMutation, useDeleteAccountMutation } = userApi;

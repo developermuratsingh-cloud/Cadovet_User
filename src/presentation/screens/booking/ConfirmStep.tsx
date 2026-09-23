@@ -99,10 +99,10 @@ export default function ConfirmStep() {
     <Screen
       edges={['left', 'right', 'bottom']}
       footer={<Button title={t('booking.confirmBooking')} icon="checkmark-circle" variant="success" onPress={confirm} loading={isLoading} disabled={!!notesError} />}>
-      <StepHeader current={5} title={t('booking.review')} />
+      <StepHeader current={4} title={t('booking.review')} />
+      <AppText color="textSecondary">{t('booking.requestNote')}</AppText>
       <Card>
         <Row label={t('booking.service')} value={draft.selectedService.name} />
-        <Row label={t('booking.doctor')} value={draft.selectedDoctor.name} />
         <Row label={t('booking.pet')} value={pet?.name ?? ''} />
         <Row label={t('booking.when')} value={`${formatDate(draft.selectedDate, language)} · ${draft.selectedTime}`} />
         <Row label={t('booking.price')} value={formatCurrency(draft.selectedService.price, language)} />

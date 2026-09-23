@@ -1,46 +1,71 @@
 import { Link } from 'expo-router';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput, View } from 'react-native';
 
-import { isApiError } from '@/core/errors';
-import { useSignupMutation } from '@/data/api/authApi';
-import { normalizeIdentifier, validateCode, validateConfirmPassword, validateIdentifier, validateName, validatePassword } from '@/domain/usecases/validation';
-import { AppText, Button, PasswordStrength, TextField } from '../../components';
-import { useApiErrorMessage } from '../../hooks/useApiErrorMessage';
+import { dialCode, type CountryCode } from '@/core/config/countries';
+import { useSendOtpMutation, useSignupWithOtpMutation } from '@/data/api/authApi';
+import { HOME_COUNTRY, toServerMobile, validateCode, validateMobile, validateName, validateOptionalEmail } from '@/domain/usecases/validation';
+import { AppText, Button, MobileField, OtpEntry, TextField } from '../../components';
 import { useForm } from '../../hooks/useForm';
+import { useOtpErrorMessage } from '../../hooks/useOtpErrorMessage';
 import { AuthLayout } from './AuthLayout';
 
 const validators = {
   name: validateName,
-  identifier: validateIdentifier,
-  password: validatePassword,
-  confirm: (v: string, all: { password: string }) => validateConfirmPassword(v, all.password),
+  mobile: (v: string, all: { country: CountryCode }) => validateMobile(v, all.country),
+  email: validateOptionalEmail,
   referralCode: validateCode(true),
 };
 
+// Mobile number is required (it receives the sign-in code); email is optional. No password: the code proves the number.
 export default function RegisterScreen() {
   const { t } = useTranslation();
-  const errorMessage = useApiErrorMessage();
-  const [signup, { isLoading, error }] = useSignupMutation();
-  const identifierRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
+  const otpError = useOtpErrorMessage();
+  const [sendOtp, { isLoading: sending, error: sendError, reset: resetSend }] = useSendOtpMutation();
+  const [signup, { isLoading: verifying, error: verifyError, reset: resetVerify }] = useSignupWithOtpMutation();
+  const mobileRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
   const referralRef = useRef<TextInput>(null);
-  const form = useForm({ name: '', identifier: '', password: '', confirm: '', referralCode: '' }, validators);
+  const form = useForm({ name: '', mobile: '', country: HOME_COUNTRY, email: '', referralCode: '' }, validators);
+  const [sentTo, setSentTo] = useState<{ mobile: string; label: string } | null>(null);
 
-  const submit = form.handleSubmit(({ name, identifier, password, referralCode }) => {
-    signup({ name: name.trim(), identifier: normalizeIdentifier(identifier), password, referralCode: referralCode.trim() || undefined });
+  const requestCode = form.handleSubmit(async ({ mobile, country, email }) => {
+    const server = toServerMobile(mobile, country);
+    try {
+      // The email goes along so the server can reject one that is already taken before any SMS is sent.
+      await sendOtp({ mobile: server, purpose: 'signup', email: email.trim() || undefined }).unwrap();
+      setSentTo({ mobile: server, label: `${dialCode(country)} ${mobile.trim()}` });
+    } catch {
+      // shown through sendError
+    }
   });
 
-  const serverError = error
-    ? isApiError(error) && error.status === 409
-      ? t('auth.alreadyExists')
-      : isApiError(error) && error.status === 400 && /referral/i.test(error.message)
-        ? t('auth.referralNotFound')
-        : errorMessage(error)
-    : null;
+  const changeNumber = () => {
+    resetSend();
+    resetVerify();
+    setSentTo(null);
+  };
 
+  if (sentTo) {
+    const { name, email, referralCode } = form.values;
+    return (
+      <AuthLayout title={t('otp.title')} subtitle={t('otp.sent', { mobile: sentTo.label })}>
+        <OtpEntry
+          submitLabel={t('otp.verifySignup')}
+          onSubmit={(code) =>
+            signup({ name: name.trim(), mobile: sentTo.mobile, email: email.trim() || undefined, referralCode: referralCode.trim() || undefined, code })
+          }
+          onResend={() => sendOtp({ mobile: sentTo.mobile, purpose: 'signup', email: email.trim() || undefined }).unwrap()}
+          onChangeNumber={changeNumber}
+          loading={verifying}
+          error={otpError(verifyError, 'verify') ?? otpError(sendError, 'send')}
+        />
+      </AuthLayout>
+    );
+  }
+
+  const sendMessage = otpError(sendError, 'send');
   return (
     <AuthLayout title={t('auth.signupTitle')} subtitle={t('auth.signupSubtitle')}>
       <TextField
@@ -53,52 +78,34 @@ export default function RegisterScreen() {
         autoComplete="name"
         autoCapitalize="words"
         returnKeyType="next"
-        onSubmitEditing={() => identifierRef.current?.focus()}
+        onSubmitEditing={() => mobileRef.current?.focus()}
+      />
+      <MobileField
+        {...form.fieldProps('mobile')}
+        country={form.values.country}
+        onChangeCountry={(c) => form.setValue('country', c)}
+        inputRef={mobileRef}
+        label={t('auth.mobile')}
+        placeholder={t('auth.mobilePlaceholder')}
+        returnKeyType="next"
+        onSubmitEditing={() => emailRef.current?.focus()}
       />
       <TextField
-        {...form.fieldProps('identifier')}
-        inputRef={identifierRef}
-        label={t('auth.identifier')}
-        placeholder={t('auth.identifierPlaceholder')}
+        {...form.fieldProps('email')}
+        inputRef={emailRef}
+        label={t('auth.email')}
+        placeholder={t('auth.emailPlaceholder')}
         icon="mail-outline"
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
-        textContentType="username"
-        autoComplete="username"
-        returnKeyType="next"
-        onSubmitEditing={() => passwordRef.current?.focus()}
-      />
-      <View style={{ gap: 8 }}>
-        <TextField
-          {...form.fieldProps('password')}
-          inputRef={passwordRef}
-          label={t('auth.password')}
-          placeholder={t('auth.newPasswordPlaceholder')}
-          icon="lock-closed-outline"
-          secureTextEntry
-          maxLength={72}
-          textContentType="newPassword"
-          autoComplete="new-password"
-          returnKeyType="next"
-          onSubmitEditing={() => confirmRef.current?.focus()}
-        />
-        <PasswordStrength password={form.values.password} />
-      </View>
-      <TextField
-        {...form.fieldProps('confirm')}
-        inputRef={confirmRef}
-        label={t('auth.confirmPassword')}
-        placeholder={t('auth.confirmPasswordPlaceholder')}
-        icon="shield-checkmark-outline"
-        secureTextEntry
-        maxLength={72}
-        textContentType="newPassword"
+        textContentType="emailAddress"
+        autoComplete="email"
         returnKeyType="next"
         onSubmitEditing={() => referralRef.current?.focus()}
       />
       <TextField
-        {...form.fieldProps('referralCode', (v) => v.toUpperCase().replace(/\s/g, ''))}
+        {...form.fieldProps('referralCode')}
         inputRef={referralRef}
         label={t('auth.referralCode')}
         placeholder={t('auth.referralPlaceholder')}
@@ -107,10 +114,10 @@ export default function RegisterScreen() {
         autoCorrect={false}
         maxLength={12}
         returnKeyType="go"
-        onSubmitEditing={submit}
+        onSubmitEditing={requestCode}
       />
-      {serverError ? <AppText color="danger" accessibilityRole="alert">{serverError}</AppText> : null}
-      <Button title={t('auth.createAccount')} onPress={submit} loading={isLoading} />
+      {sendMessage ? <AppText color="danger" accessibilityRole="alert">{sendMessage}</AppText> : null}
+      <Button title={t('auth.sendOtp')} onPress={requestCode} loading={sending} />
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
         <AppText color="textSecondary">{t('auth.haveAccount')}</AppText>
         <Link href="/login"><AppText color="primaryDark" bold>{t('auth.loginLink')}</AppText></Link>

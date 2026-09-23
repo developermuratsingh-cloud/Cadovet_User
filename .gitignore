@@ -35,6 +35,7 @@ yarn-error.*
 .env
 .env.*
 !.env.example
+.env.example
 
 # local tool settings
 .claude/settings.local.json

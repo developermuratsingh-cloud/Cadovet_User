@@ -95,7 +95,6 @@ function AppShell() {
           <Stack.Protected guard={isAuthenticated}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="book/index" options={{ title: t('booking.chooseService') }} />
-            <Stack.Screen name="book/doctor" options={{ title: t('booking.chooseDoctor') }} />
             <Stack.Screen name="book/pet" options={{ title: t('booking.choosePet') }} />
             <Stack.Screen name="book/schedule" options={{ title: t('booking.chooseDate') }} />
             <Stack.Screen name="book/confirm" options={{ title: t('booking.review') }} />
@@ -124,7 +123,6 @@ function AppShell() {
           <Stack.Protected guard={!isAuthenticated}>
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="register" options={{ headerShown: false }} />
-            <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
           </Stack.Protected>
         </Stack>
         {isAuthenticated ? <SideMenu /> : null}

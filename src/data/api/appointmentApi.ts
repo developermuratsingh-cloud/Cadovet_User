@@ -18,8 +18,9 @@ export const appointmentApi = baseApi.injectEndpoints({
       transformResponse: unwrap(toAppointment),
       providesTags: (_r, _e, id) => [{ type: 'Appointment', id }],
     }),
-    getAvailability: build.query<TimeSlot[], { doctorId: number; date: string }>({
-      query: ({ doctorId, date }) => `/appointments/availability?doctor_id=${doctorId}&date=${date}`,
+    // The clinic's free times for a date. The customer chooses a time; the operational head assigns the doctor later.
+    getAvailability: build.query<TimeSlot[], { date: string }>({
+      query: ({ date }) => `/appointments/availability?date=${date}`,
       transformResponse: unwrap(toTimeSlots as (d: SlotsDto) => TimeSlot[]),
       providesTags: ['Slots'],
     }),
@@ -29,7 +30,6 @@ export const appointmentApi = baseApi.injectEndpoints({
         method: 'POST',
         body: {
           pet_id: a.petId,
-          doctor_id: a.doctorId,
           service_id: a.serviceId,
           appointment_date: a.date,
           appointment_time: a.time,

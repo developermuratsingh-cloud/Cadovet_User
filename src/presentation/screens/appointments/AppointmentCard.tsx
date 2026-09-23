@@ -30,7 +30,7 @@ export function AppointmentCard({ appointment: a, onPress }: { appointment: Appo
         <AppText variant="caption" color="textSecondary">🕒 {a.time}  ·  {date.toLocaleDateString(locale, { weekday: 'short' })}</AppText>
         <AppText variant="caption" color="textMuted" numberOfLines={1}>
           {t('appointments.forPet', { name: a.petName })}
-          {a.doctorName ? `  ·  ${t('appointments.with', { name: a.doctorName })}` : ''}
+          {a.doctorName ? `  ·  ${t('appointments.with', { name: a.doctorName })}` : `  ·  ${t('appointments.doctorPending')}`}
         </AppText>
       </View>
     </Card>

@@ -2,16 +2,34 @@ import * as v from '../src/domain/usecases/validation.ts';
 let pass = 0, fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); ok ? pass++ : (fail++, console.log('FAIL', name, 'got', JSON.stringify(got), 'want', JSON.stringify(want))); };
 const code = (e: v.ValidationError | null) => e?.code ?? null;
-// identifier
-eq('email ok', code(v.validateIdentifier('a@b.co')), null);
-eq('email bad', code(v.validateIdentifier('a@b')), 'emailInvalid');
-eq('mobile ok', code(v.validateIdentifier('9876543210')), null);
-eq('mobile spaced ok', code(v.validateIdentifier('98765 43210')), null);
-eq('mobile +91 ok', code(v.validateIdentifier('+91 98765-43210')), null);
-eq('mobile short', code(v.validateIdentifier('12345')), 'mobileInvalid');
-eq('identifier empty', code(v.validateIdentifier('  ')), 'required');
-eq('normalize mobile', v.normalizeIdentifier(' 98765 43210 '), '9876543210');
-eq('normalize email untouched', v.normalizeIdentifier(' a@b.co '), 'a@b.co');
+// mobile: country-aware validation
+eq('IN mobile ok', code(v.validateMobile('9876543210', 'IN')), null);
+eq('IN spaced ok', code(v.validateMobile('98765 43210', 'IN')), null);
+eq('default country is IN', code(v.validateMobile('9876543210')), null);
+eq('IN fake number', code(v.validateMobile('1234567890', 'IN')), 'mobileInvalid');
+eq('IN too short', code(v.validateMobile('12345', 'IN')), 'mobileInvalid');
+eq('mobile empty', code(v.validateMobile('  ', 'IN')), 'required');
+eq('US number ok', code(v.validateMobile('415 555 2671', 'US')), null);
+eq('US number under IN', code(v.validateMobile('4155552671', 'IN')), 'mobileInvalid');
+eq('intl number ignores country', code(v.validateMobile('+14155552671', 'IN')), null);
+eq('+91 with dashes ok', code(v.validateMobile('+91 98765-43210', 'IN')), null);
+// mobile: input cleanup
+eq('sanitize strips junk', v.sanitizePhoneInput('98a-76 5', 'IN'), { country: 'IN', digits: '98765' });
+eq('sanitize caps length', v.sanitizePhoneInput('1'.repeat(20), 'IN').digits.length, 15);
+eq('sanitize pasted intl', v.sanitizePhoneInput('+1 415 555 2671', 'IN'), { country: 'US', digits: '4155552671' });
+eq('sanitize partial plus keeps country', v.sanitizePhoneInput('+9', 'IN'), { country: 'IN', digits: '9' });
+// mobile: what the server receives
+eq('server IN national', v.toServerMobile('98765 43210', 'IN'), '9876543210');
+eq('server IN pasted +91', v.toServerMobile('+91 98765 43210', 'IN'), '9876543210');
+eq('server US e164', v.toServerMobile('(415) 555-2671', 'US'), '+14155552671');
+eq('server UK trunk zero', v.toServerMobile('07911 123456', 'GB'), '+447911123456');
+// optional email
+eq('email empty ok', code(v.validateOptionalEmail('')), null);
+eq('email blank ok', code(v.validateOptionalEmail('   ')), null);
+eq('email ok', code(v.validateOptionalEmail('a@b.co')), null);
+eq('email trimmed ok', code(v.validateOptionalEmail(' a@b.co ')), null);
+eq('email bad', code(v.validateOptionalEmail('a@b')), 'emailInvalid');
+eq('email no at', code(v.validateOptionalEmail('plain')), 'emailInvalid');
 // name
 eq('name ok', code(v.validateName('Rahul Verma')), null);
 eq('name unicode ok', code(v.validateName('राहुल वर्मा')), null);
@@ -20,16 +38,6 @@ eq('name short', code(v.validateName('R')), 'nameTooShort');
 eq('name digits', code(v.validateName('R2D2')), 'nameInvalid');
 eq('name empty', code(v.validateName('')), 'required');
 eq('name long', code(v.validateName('a'.repeat(61))), 'tooLong');
-// password
-eq('pw ok', code(v.validatePassword('secret1')), null);
-eq('pw short', code(v.validatePassword('12345')), 'passwordTooShort');
-eq('pw empty', code(v.validatePassword('')), 'required');
-eq('pw confirm mismatch', code(v.validateConfirmPassword('a', 'b')), 'passwordMismatch');
-eq('pw confirm ok', code(v.validateConfirmPassword('abc123', 'abc123')), null);
-eq('strength short', v.passwordStrength('abc'), 0);
-eq('strength weak', v.passwordStrength('abcdef'), 1);
-eq('strength fair', v.passwordStrength('abcd1234'), 2);
-eq('strength strong', v.passwordStrength('Abcd1234!x'), 3);
 // dob
 const now = new Date(2026, 8, 20);
 eq('dob empty ok', code(v.validateDateOfBirth('', now)), null);

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState, type Ref } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { fonts } from '../theme/tokens';
@@ -11,11 +11,13 @@ interface Props extends TextInputProps {
   error?: string | null;
   helper?: string;
   icon?: keyof typeof Ionicons.glyphMap;
+  /** Replaces the icon, e.g. the country-code button of the mobile field. */
+  leading?: ReactNode;
   inputRef?: Ref<TextInput>;
   showCounter?: boolean;
 }
 
-export function TextField({ label, error, helper, icon, inputRef, showCounter, multiline, secureTextEntry, style, onFocus, onBlur, value, maxLength, ...rest }: Props) {
+export function TextField({ label, error, helper, icon, leading, inputRef, showCounter, multiline, secureTextEntry, style, onFocus, onBlur, value, maxLength, ...rest }: Props) {
   const { colors, radius } = useTheme();
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(true);
@@ -26,7 +28,7 @@ export function TextField({ label, error, helper, icon, inputRef, showCounter, m
     <View style={styles.wrapper}>
       <AppText variant="label" color="textSecondary">{label}</AppText>
       <View style={[styles.field, multiline && styles.fieldMultiline, { backgroundColor: colors.surface, borderColor, borderRadius: radius.md }]}>
-        {icon ? <Ionicons name={icon} size={18} color={focused ? colors.primary : colors.textMuted} style={multiline ? styles.iconTop : undefined} /> : null}
+        {leading ?? (icon ? <Ionicons name={icon} size={18} color={focused ? colors.primary : colors.textMuted} style={multiline ? styles.iconTop : undefined} /> : null)}
         <TextInput
           {...rest}
           ref={inputRef}

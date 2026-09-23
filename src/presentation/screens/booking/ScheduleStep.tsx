@@ -13,17 +13,14 @@ export default function ScheduleStep() {
   const { t } = useTranslation();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { selectedDoctor, selectedDate, selectedTime } = useAppSelector(selectBooking);
-
-  if (!selectedDoctor) return null;
+  const { selectedDate, selectedTime } = useAppSelector(selectBooking);
 
   return (
     <Screen
       edges={['left', 'right', 'bottom']}
       footer={<Button title={t('common.next')} icon="arrow-forward" disabled={!selectedDate || !selectedTime} onPress={() => router.push('/book/confirm')} />}>
-      <StepHeader current={4} title={t('booking.when')} />
+      <StepHeader current={3} title={t('booking.when')} />
       <SlotPicker
-        doctorId={selectedDoctor.id}
         date={selectedDate}
         time={selectedTime}
         onDateChange={(d) => dispatch(dateSelected(d))}

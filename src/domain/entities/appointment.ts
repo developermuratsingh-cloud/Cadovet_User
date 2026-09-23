@@ -20,7 +20,6 @@ export interface Appointment {
 
 export interface AppointmentInput {
   petId: number;
-  doctorId: number;
   serviceId: number | null;
   date: string;
   time: string;

@@ -3,59 +3,59 @@ import { credentialsSet } from '@/presentation/state/slices/authSlice';
 import type { ApiEnvelope, LoginDto } from '../dto';
 import { baseApi, unwrap } from './baseApi';
 
-export interface LoginRequest {
-  identifier: string; // email or mobile number
-  password: string;
+// There are no passwords: a customer proves their mobile number with a 6-digit code sent by SMS.
+export type OtpPurpose = 'login' | 'signup';
+
+export interface SendOtpRequest {
+  mobile: string; // as the server stores it, see toServerMobile
+  purpose: OtpPurpose;
+  email?: string; // sign-up only: lets the server reject an email that is already taken before the code is sent
 }
 
-export interface SignupRequest extends LoginRequest {
+export interface LoginOtpRequest {
+  mobile: string;
+  code: string;
+}
+
+export interface SignupOtpRequest extends LoginOtpRequest {
   name: string;
+  email?: string;
   referralCode?: string;
 }
 
+// Both verify endpoints answer with a session, which is stored the moment it arrives.
+async function storeSession(dispatch: (a: ReturnType<typeof credentialsSet>) => unknown, queryFulfilled: Promise<{ data: AuthTokens }>) {
+  try {
+    const { data } = await queryFulfilled;
+    dispatch(credentialsSet(data));
+  } catch {
+    // Failure surfaces through the mutation state on the calling screen.
+  }
+}
+
+const toTokens = unwrap<LoginDto, AuthTokens>((d) => ({ accessToken: d.token, refreshToken: d.refreshToken }));
+
 export const authApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    login: build.mutation<AuthTokens, LoginRequest>({
-      query: (body) => ({ url: '/auth/login', method: 'POST', body }),
-      transformResponse: unwrap<LoginDto, AuthTokens>((d) => ({ accessToken: d.token, refreshToken: d.refreshToken })),
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          dispatch(credentialsSet(data));
-        } catch {
-          // Failure surfaces through the mutation state on the calling screen.
-        }
-      },
+    sendOtp: build.mutation<void, SendOtpRequest>({
+      query: (body) => ({ url: '/auth/otp/send', method: 'POST', body }),
+      transformResponse: (_: ApiEnvelope<unknown>) => undefined,
     }),
 
-    // The backend's signup does not return a token, so sign in right after registering.
-    signup: build.mutation<void, SignupRequest>({
-      query: ({ name, identifier, password, referralCode }) => ({
-        url: '/auth/signup',
+    loginWithOtp: build.mutation<AuthTokens, LoginOtpRequest>({
+      query: (body) => ({ url: '/auth/otp/login', method: 'POST', body }),
+      transformResponse: toTokens,
+      onQueryStarted: (_, { dispatch, queryFulfilled }) => storeSession(dispatch, queryFulfilled),
+    }),
+
+    signupWithOtp: build.mutation<AuthTokens, SignupOtpRequest>({
+      query: ({ name, mobile, email, referralCode, code }) => ({
+        url: '/auth/otp/signup',
         method: 'POST',
-        body: { name, identifier, password, ...(referralCode ? { referral_code: referralCode } : {}) },
+        body: { name, mobile, code, ...(email ? { email } : {}), ...(referralCode ? { referral_code: referralCode } : {}) },
       }),
-      transformResponse: (_: ApiEnvelope<unknown>) => undefined,
-      async onQueryStarted({ identifier, password }, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          await dispatch(authApi.endpoints.login.initiate({ identifier, password }));
-        } catch {
-          // Failure surfaces through the mutation state on the calling screen.
-        }
-      },
-    }),
-
-    // Step 1 of a password reset: the server always answers the same way, whether or not the account exists.
-    forgotPassword: build.mutation<void, { identifier: string }>({
-      query: (body) => ({ url: '/auth/forgot-password', method: 'POST', body }),
-      transformResponse: (_: ApiEnvelope<unknown>) => undefined,
-    }),
-
-    // Step 2: the emailed/SMS code plus the new password. Signs the account out everywhere.
-    resetPassword: build.mutation<void, { identifier: string; code: string; password: string }>({
-      query: (body) => ({ url: '/auth/reset-password', method: 'POST', body }),
-      transformResponse: (_: ApiEnvelope<unknown>) => undefined,
+      transformResponse: toTokens,
+      onQueryStarted: (_, { dispatch, queryFulfilled }) => storeSession(dispatch, queryFulfilled),
     }),
 
     // Best-effort revocation of the refresh token; the caller clears local state regardless.
@@ -66,4 +66,4 @@ export const authApi = baseApi.injectEndpoints({
   }),
 });
 
-export const { useLoginMutation, useSignupMutation, useForgotPasswordMutation, useResetPasswordMutation } = authApi;
+export const { useSendOtpMutation, useLoginWithOtpMutation, useSignupWithOtpMutation } = authApi;

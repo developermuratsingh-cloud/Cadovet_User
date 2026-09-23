@@ -55,11 +55,11 @@ export default function HomeScreen() {
     dispatch(bookingReset());
     router.push('/book');
   };
-  // Tapping a service jumps straight to choosing a doctor for it.
+  // Tapping a service jumps straight to choosing the pet for it.
   const bookService = (service: Service) => {
     dispatch(bookingReset());
     dispatch(serviceSelected(service));
-    router.push('/book/doctor');
+    router.push('/book/pet');
   };
 
   return (

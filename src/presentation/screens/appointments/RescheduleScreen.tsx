@@ -35,10 +35,8 @@ export default function RescheduleScreen() {
       edges={['left', 'right', 'bottom']}
       footer={<Button title={t('appointments.rescheduleConfirm')} disabled={!date || !time} loading={isLoading} onPress={submit} />}>
       <AsyncBoundary {...query}>
-        {(a) =>
-          a.doctorId ? (
+        {() => (
             <SlotPicker
-              doctorId={a.doctorId}
               date={date}
               time={time}
               onDateChange={(d) => {
@@ -47,8 +45,7 @@ export default function RescheduleScreen() {
               }}
               onTimeChange={setTime}
             />
-          ) : null
-        }
+        )}
       </AsyncBoundary>
     </Screen>
   );
