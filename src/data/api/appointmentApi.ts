@@ -1,5 +1,5 @@
-import type { Appointment, AppointmentInput, TimeSlot } from '@/domain/entities';
-import type { AppointmentDto, SlotsDto } from '../dto';
+import type { Appointment, AppointmentInput, HomeVisitConfirmation, HomeVisitInput, TimeSlot } from '@/domain/entities';
+import type { AppointmentDto, PublicBookingDto, SlotsDto } from '../dto';
 import { toAppointment, toTimeSlots } from '../mappers';
 import { baseApi, unwrap } from './baseApi';
 
@@ -30,7 +30,7 @@ export const appointmentApi = baseApi.injectEndpoints({
         method: 'POST',
         body: {
           pet_id: a.petId,
-          service_id: a.serviceId,
+          ...(a.serviceId ? { service_id: a.serviceId } : {}),
           appointment_date: a.date,
           appointment_time: a.time,
           reason: a.reason,
@@ -40,6 +40,40 @@ export const appointmentApi = baseApi.injectEndpoints({
       }),
       transformResponse: unwrap((d: AppointmentDto) => toAppointment({ ...d, pet_name: '' })),
       invalidatesTags: [{ type: 'Appointment', id: 'LIST' }, 'Slots'],
+    }),
+    // The website's doorstep booking: owner and pet details are sent inline, and the server matches the customer by
+    // mobile number, so a booking made with the account's own number shows up under that account.
+    bookHomeVisit: build.mutation<HomeVisitConfirmation, HomeVisitInput>({
+      query: (a) => ({
+        url: '/appointments/public',
+        method: 'POST',
+        body: {
+          owner_name: a.ownerName,
+          phone: a.phone,
+          ...(a.email ? { email: a.email } : {}),
+          pet_name: a.petName,
+          species: a.species,
+          breed: a.breed,
+          age_years: a.ageYears,
+          gender: a.gender,
+          is_aggressive: a.isAggressive,
+          ...(a.serviceId ? { service_id: a.serviceId } : {}),
+          service_name: a.serviceName,
+          appointment_date: a.date,
+          appointment_time: a.time,
+          address: a.address,
+          notes: a.notes,
+          total_amount: a.totalAmount,
+        },
+      }),
+      transformResponse: unwrap((d: PublicBookingDto): HomeVisitConfirmation => ({
+        appointmentId: d.appointment_id,
+        customerName: d.customer_name,
+        petName: d.pet_name,
+        date: d.appointment_date,
+        time: d.appointment_time,
+      })),
+      invalidatesTags: [{ type: 'Appointment', id: 'LIST' }, { type: 'Pet', id: 'LIST' }, 'Slots'],
     }),
     cancelAppointment: build.mutation<void, number>({
       query: (id) => ({ url: `/appointments/${id}/cancel`, method: 'PATCH' }),
@@ -63,6 +97,7 @@ export const {
   useGetAppointmentQuery,
   useGetAvailabilityQuery,
   useBookAppointmentMutation,
+  useBookHomeVisitMutation,
   useCancelAppointmentMutation,
   useRescheduleAppointmentMutation,
 } = appointmentApi;

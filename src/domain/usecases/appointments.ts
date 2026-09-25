@@ -1,5 +1,5 @@
 import type { Appointment } from '../entities';
-import { parseTimeLabel, toDateString } from './dates';
+import { parseTimeLabel, toDateString } from './dates.ts';
 
 const ACTIVE = ['PENDING', 'CONFIRMED'];
 

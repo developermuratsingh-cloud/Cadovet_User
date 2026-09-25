@@ -194,3 +194,11 @@ export interface ReferralDto {
   friends_joined: number;
   friend_coupon: { code: string; title: string; discount_type: 'PERCENT' | 'FLAT'; discount_value: string } | null;
 }
+
+export interface PublicBookingDto {
+  appointment_id: number;
+  appointment_date: string;
+  appointment_time: string;
+  pet_name: string;
+  customer_name: string;
+}

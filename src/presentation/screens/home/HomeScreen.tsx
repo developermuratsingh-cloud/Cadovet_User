@@ -59,7 +59,7 @@ export default function HomeScreen() {
   const bookService = (service: Service) => {
     dispatch(bookingReset());
     dispatch(serviceSelected(service));
-    router.push('/book/pet');
+    router.push('/book');
   };
 
   return (

@@ -52,7 +52,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --no-warnings tests/validation.test.mts && node --experimental-strip-types --no-warnings tests/search.test.mts && node --experimental-strip-types --no-warnings tests/dates.test.mts"
+    "test": "node --experimental-strip-types --no-warnings tests/validation.test.mts && node --experimental-strip-types --no-warnings tests/search.test.mts && node --experimental-strip-types --no-warnings tests/dates.test.mts && node --experimental-strip-types --no-warnings tests/booking.test.mts"
   },
   "private": true
 }

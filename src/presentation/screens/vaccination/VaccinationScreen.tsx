@@ -37,7 +37,7 @@ export default function VaccinationScreen() {
   const book = (service: Service) => {
     dispatch(bookingReset());
     dispatch(serviceSelected(service));
-    router.push('/book/pet');
+    router.push('/book');
   };
 
   return (

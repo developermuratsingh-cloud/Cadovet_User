@@ -94,10 +94,7 @@ function AppShell() {
           }}>
           <Stack.Protected guard={isAuthenticated}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="book/index" options={{ title: t('booking.chooseService') }} />
-            <Stack.Screen name="book/pet" options={{ title: t('booking.choosePet') }} />
-            <Stack.Screen name="book/schedule" options={{ title: t('booking.chooseDate') }} />
-            <Stack.Screen name="book/confirm" options={{ title: t('booking.review') }} />
+            <Stack.Screen name="book/index" options={{ title: t('booking.title') }} />
             <Stack.Screen name="appointment/[id]" options={{ title: t('appointments.detailTitle') }} />
             <Stack.Screen name="appointment/reschedule/[id]" options={{ title: t('appointments.rescheduleTitle') }} />
             <Stack.Screen name="pet/[id]" options={{ title: t('pets.details') }} />

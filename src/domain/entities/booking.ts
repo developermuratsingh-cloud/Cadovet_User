@@ -1,11 +1,37 @@
+import type { PetGender } from './pet';
 import type { Service } from './service';
 
-// In-progress booking wizard state. Availability and final validation are enforced by the backend.
+// The service (and coupon) chosen before the booking form opens, e.g. from a Home or Vaccination shortcut.
 export interface BookingDraft {
   selectedService: Service | null;
-  petId: number | null;
-  selectedDate: string | null; // YYYY-MM-DD
-  selectedTime: string | null; // "10:30 AM"
+  couponCode: string | null;
+}
+
+
+// The website's "Book Home Visit" form: owner and pet details travel with the booking.
+export interface HomeVisitInput {
+  ownerName: string;
+  phone: string; // 10 digits
+  email?: string;
+  petName: string;
+  species: string;
+  breed: string;
+  ageYears: number;
+  gender: PetGender;
+  isAggressive: boolean;
+  serviceId?: number; // omitted for the default Home Visit Consultation, which the server finds by name
+  serviceName: string;
+  date: string; // YYYY-MM-DD
+  time: string; // "10:00 AM"
+  address: string;
   notes: string;
-  couponCode: string | null; // chosen from the Coupon screen or typed on the review step
+  totalAmount: number;
+}
+
+export interface HomeVisitConfirmation {
+  appointmentId: number;
+  customerName: string;
+  petName: string;
+  date: string;
+  time: string;
 }

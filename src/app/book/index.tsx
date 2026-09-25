@@ -1,1 +1,1 @@
-export { default } from '@/presentation/screens/booking/ServiceStep';
+export { default } from '@/presentation/screens/booking/BookingForm';

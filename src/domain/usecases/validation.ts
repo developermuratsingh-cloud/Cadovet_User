@@ -9,6 +9,8 @@ export type ValidationCode =
   | 'nameInvalid'
   | 'emailInvalid'
   | 'mobileInvalid'
+  | 'phone10'
+  | 'ageInvalid'
   | 'dateFormat'
   | 'dateInvalid'
   | 'dateFuture'
@@ -75,6 +77,17 @@ export const toServerMobile = (raw: string, country: CountryCode = HOME_COUNTRY)
   const parsed = parsePhoneNumberFromString(v, country);
   if (!parsed) return v.replace(/\D/g, '');
   return parsed.country === HOME_COUNTRY ? parsed.nationalNumber : parsed.number;
+};
+
+/** The website's doorstep form takes a plain 10-digit mobile number. */
+export const validateTenDigitPhone = (raw: string): ValidationError | null =>
+  !raw ? fail('required') : /^\d{10}$/.test(raw) ? null : fail('phone10');
+
+/** Pet age in years, 0-100, as the server accepts it. */
+export const validateAge = (raw: string): ValidationError | null => {
+  if (!raw.trim()) return fail('required');
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? null : fail('ageInvalid');
 };
 
 /** Optional. Empty is fine; otherwise it must look like an email address. */
